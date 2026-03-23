@@ -1,0 +1,333 @@
+{
+
+  "nodes": [
+
+    {
+
+      "parameters": {},
+
+      "id": "e4e4e234-db2a-4b0e-aff3-5c9f59215b1c",
+
+      "name": "Manuel Tetikleyici",
+
+      "type": "n8n-nodes-base.manualTrigger",
+
+      "typeVersion": 1,
+
+      "position": [
+
+        1968,
+
+        -1040
+
+      ]
+
+    },
+
+    {
+
+      "parameters": {
+
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.sentIds) staticData.sentIds = [];\n\n// Başarıyla gönderilen mesajın ID'sini hafızaya ekle\nconst msgId = $input.first().json.msgId;\n\nif (msgId && !staticData.sentIds.includes(msgId)) {\n    staticData.sentIds.push(msgId);\n}\n\n// Hafızanın şişmemesi için son 100 kaydı tutalım\nif (staticData.sentIds.length > 100) {\n    staticData.sentIds = staticData.sentIds.slice(-100);\n}\n\nreturn $input.all();"
+
+      },
+
+      "id": "b3f46910-c6de-4923-baf1-8056b347fd8e",
+
+      "name": "Hafızaya Yaz",
+
+      "type": "n8n-nodes-base.code",
+
+      "typeVersion": 2,
+
+      "position": [
+
+        3024,
+
+        -1040
+
+      ]
+
+    },
+
+    {
+
+      "parameters": {
+
+        "method": "POST",
+
+        "url": "https://api.green-api.com/waInstance7103524249/sendMessage/5329287556f0482fad011e6408892f7920e90e0fb849415593",
+
+        "sendBody": true,
+
+        "bodyParameters": {
+
+          "parameters": [
+
+            {
+
+              "name": "chatId",
+
+              "value": "120363417477954963@g.us"
+
+            },
+
+            {
+
+              "name": "message",
+
+              "value": "={{ $json.mesaj }}"
+
+            }
+
+          ]
+
+        },
+
+        "options": {}
+
+      },
+
+      "id": "4ae253b3-6c6a-4f1e-b830-96db3eee404b",
+
+      "name": "WhatsApp Grup Gönderici1",
+
+      "type": "n8n-nodes-base.httpRequest",
+
+      "typeVersion": 4.1,
+
+      "position": [
+
+        2832,
+
+        -1040
+
+      ]
+
+    },
+
+    {
+
+      "parameters": {
+
+        "jsCode": "function parseTurkishDate(text) {\n    if (typeof text !== 'string') return null;\n    const months = {\n        \"ocak\": 0, \"şubat\": 1, \"mart\": 2, \"nisan\": 3, \"mayıs\": 4, \"haziran\": 5,\n        \"temmuz\": 6, \"ağustos\": 7, \"eylül\": 8, \"ekim\": 9, \"kasım\": 10, \"aralık\": 11\n    };\n    const match = text.match(/(\\d{1,2})\\s+([a-zA-ZğüşıöçĞÜŞİÖÇ]+)\\s+(\\d{4})/i);\n    if (!match) return null;\n    return new Date(parseInt(match[3]), months[match[2].toLowerCase()], parseInt(match[1]));\n}\n\nfunction processMessage(html) {\n    if (typeof html !== 'string') return \"\";\n    let links = [];\n    let text = html;\n    const linkRegex = /<a[^>]+href=\\\"([^\\\"]+)\\\"[^>]*>(.*?)<\\/a>/gi;\n    let match;\n    while ((match = linkRegex.exec(html)) !== null) {\n        const url = match[1];\n        if (url.startsWith('http')) links.push(url);\n    }\n    text = text.replace(/<br\\s*\\/?>/gi, '\\n').replace(/<\\/div>/gi, '\\n').replace(/<\\/p>/gi, '\\n');\n    text = text.replace(/<[^>]+>/g, '');\n    text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"');\n    let finalMessage = text.trim();\n    if (links.length > 0) {\n        const uniqueLinks = [...new Set(links)];\n        finalMessage += \"\\n\\n🔗 Detay ve Kayıt:\\n\" + uniqueLinks.join('\\n');\n    }\n    finalMessage += \"\\n\\n📍 IGD Sektör Bülteni\\nℹ️ Kaynak: OSE\";\n    return finalMessage;\n}\n\n// --- HAFIZA VE TARİH AYARLARI ---\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.sentIds) staticData.sentIds = [];\n\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\n\n// 14 günlük tolerans penceresi (Geriye dönük tarama)\nconst thresholdDate = new Date();\nthresholdDate.setDate(today.getDate() - 14);\nthresholdDate.setHours(0, 0, 0, 0);\n\n// flatMap kullanarak listedeki her mesajı bağımsız bir n8n öğesi yapıyoruz\nreturn $input.all().flatMap(item => {\n    const rawContent = item.json.mesaj;\n    // Eğer içerik bir listeyse onu kullan, değilse listeye çevir\n    const messages = Array.isArray(rawContent) ? rawContent : [rawContent];\n\n    return messages.map(m => {\n        if (typeof m !== 'string' || m.length < 5) return null;\n\n        const eventDate = parseTurkishDate(m);\n        const msgId = m.substring(0, 150); // Hatanın çözüldüğü nokta burası\n\n        // Kriter: Daha önce atılmadıysa VE (Tarih yoksa veya Tarih >= 14 gün öncesiyse)\n        const isNew = !staticData.sentIds.includes(msgId);\n        const isRecent = !eventDate || eventDate >= thresholdDate;\n\n        if (isNew && isRecent) {\n            return { json: { mesaj: processMessage(m), msgId: msgId } };\n        }\n        return null;\n    }).filter(res => res !== null);\n});"
+
+      },
+
+      "id": "846b879c-dc08-4481-9534-d45738068938",
+
+      "name": "Tek Tek Ayır ve İmzala1",
+
+      "type": "n8n-nodes-base.code",
+
+      "typeVersion": 2,
+
+      "position": [
+
+        2640,
+
+        -1040
+
+      ]
+
+    },
+
+    {
+
+      "parameters": {
+
+        "extractionValues": {
+
+          "values": [
+
+            {
+
+              "key": "mesaj",
+
+              "cssSelector": ".tgme_widget_message_text",
+
+              "returnValue": "html",
+
+              "returnArray": true
+
+            }
+
+          ]
+
+        },
+
+        "options": {}
+
+      },
+
+      "id": "962a1778-cc24-4cd6-a161-2b69afef8628",
+
+      "name": "Mesajları Ayıkla1",
+
+      "type": "n8n-nodes-base.htmlExtract",
+
+      "typeVersion": 1,
+
+      "position": [
+
+        2416,
+
+        -1040
+
+      ]
+
+    },
+
+    {
+
+      "parameters": {
+
+        "url": "https://t.me/s/oyunsektoruetkinlikleri",
+
+        "options": {}
+
+      },
+
+      "id": "ed17ae1d-45f2-42d5-885a-c05d1b0af432",
+
+      "name": "Telegram Scraper1",
+
+      "type": "n8n-nodes-base.httpRequest",
+
+      "typeVersion": 4.1,
+
+      "position": [
+
+        2192,
+
+        -1040
+
+      ]
+
+    }
+
+  ],
+
+  "connections": {
+
+    "Manuel Tetikleyici": {
+
+      "main": [
+
+        [
+
+          {
+
+            "node": "Telegram Scraper1",
+
+            "type": "main",
+
+            "index": 0
+
+          }
+
+        ]
+
+      ]
+
+    },
+
+    "WhatsApp Grup Gönderici1": {
+
+      "main": [
+
+        [
+
+          {
+
+            "node": "Hafızaya Yaz",
+
+            "type": "main",
+
+            "index": 0
+
+          }
+
+        ]
+
+      ]
+
+    },
+
+    "Tek Tek Ayır ve İmzala1": {
+
+      "main": [
+
+        [
+
+          {
+
+            "node": "WhatsApp Grup Gönderici1",
+
+            "type": "main",
+
+            "index": 0
+
+          }
+
+        ]
+
+      ]
+
+    },
+
+    "Mesajları Ayıkla1": {
+
+      "main": [
+
+        [
+
+          {
+
+            "node": "Tek Tek Ayır ve İmzala1",
+
+            "type": "main",
+
+            "index": 0
+
+          }
+
+        ]
+
+      ]
+
+    },
+
+    "Telegram Scraper1": {
+
+      "main": [
+
+        [
+
+          {
+
+            "node": "Mesajları Ayıkla1",
+
+            "type": "main",
+
+            "index": 0
+
+          }
+
+        ]
+
+      ]
+
+    }
+
+  },
+
+  "pinData": {},
+
+  "meta": {
+
+    "instanceId": "99d8ae15d5e393ed621296069ffd4d717cae95d09008730deceaf10d670d1393"
+
+  }
+
+}
