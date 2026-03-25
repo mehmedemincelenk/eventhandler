@@ -2,7 +2,7 @@
 
 Watch the autonomous workflow in action below:
 
-📹 [View Workflow Demo](https://github.com/user-attachments/assets/11bfe87a-3401-4bd0-b95a-dd43564f9ea5)
+📹 https://github.com/user-attachments/assets/11bfe87a-3401-4bd0-b95a-dd43564f9ea5
 
 ---
 
